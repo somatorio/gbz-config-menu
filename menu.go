@@ -40,7 +40,7 @@ var (
   positiontitle sdl.Rect = sdl.Rect{80, 5, 0, 0}
   positionmenu sdl.Rect = sdl.Rect{30, 55, 0, 0}
   //as the menu cursor height will be set later as the font line height, it doesn't really matter now (so we set as 0 for the lulz =p)
-  positionmenucursor sdl.Rect = sdl.Rect{10, positionmenu.Y,620,0}
+  menucursor sdl.Rect = sdl.Rect{10, positionmenu.Y,620,0}
 )
 func run() int {
   type (
@@ -71,11 +71,10 @@ func run() int {
     surface *sdl.Surface
     menutext *sdl.Surface
     titletext *sdl.Surface
-//    err error
     input Es_input
     joystick_up, joystick_down, joystick_left, joystick_right, joystick_a, joystick_b Joystick_buttons
-//    joysticks [16]*sdl.Joystick
-//    joystick *sdl.Joystick
+    buffer bytes.Buffer
+    menuitens map[int]string
   )
 
   xmlfile, _ := os.Open("es_input.cfg")
@@ -83,7 +82,7 @@ func run() int {
 
   xml.Unmarshal([]byte(es_inputfile), &input)
 
-  //we need to create a "map" of the buttons at emulationstation so we can check what the pressed button is later
+  //we need to create a "map" of the buttons at emulationstation so we can check what the pressed button is
   for n:=0;n<len(input.Config.Buttons);n++ {
     switch input.Config.Buttons[n].Name {
     case "up":
@@ -113,18 +112,15 @@ func run() int {
     }
   }
 
- /* fmt.Printf("Config: %+v\n",input.Config)
-  fmt.Printf("Tipo: %v\n",input.Config.Type)
-  fmt.Printf("GUID: %v\n",input.Config.Guid)
-  fmt.Printf("Button: %+v\n",input.Config.Buttons[2])
-  fmt.Printf("Up: %+v\n", joystick_up)*/
-
   sdl.Init(sdl.INIT_VIDEO | sdl.INIT_JOYSTICK)
 
   ttf.Init()
 
+  //var displaybounds sdl.Rect
+  //sdl.GetDisplayBounds(0, &displaybounds)
+
   window, _ = sdl.CreateWindow(winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, winWidth, winHeight, sdl.WINDOW_SHOWN)
-  //defer window.Destroy()
+  defer window.Destroy()
 
   menu := menulistyaml()
 
@@ -135,14 +131,13 @@ func run() int {
   }
   sort.Strings(sortkey)
 
-  //as the function that "writes" only works with a single string (as far as i could test it) 
-  //we need to set the menu text as it with "\n" as line breaker
-  var buffer bytes.Buffer  
+  //we need to have a map crossing position x itemkey
+  n := 1
+  menuitens = make(map[int]string)
   for _, k := range sortkey {
-    buffer.WriteString(menu.Options[k].Desc)
-    buffer.WriteString("\n")
+    menuitens[n] = k
+    n++
   }
-  menuitens := buffer.String()
   
   //we need a font to work with =p for now we'll use same font/size for title and itens
   font, _ = ttf.OpenFont(fonttype, fontsize)
@@ -152,15 +147,23 @@ func run() int {
   positiontitle.X = int32(int(winWidth)/2 - titlewidth/2)
 
   //so we can set the menucursor height to be relative to font size :)
-  positionmenucursor.H = int32(font.Height())
+  menucursor.H = int32(font.Height())
 
-  //we need to know how many itens are fit at the screen size, it's all math: maxitems = (screenheight-titleheight)/lineheight
-  titlearea := int(positiontitle.Y)+font.Height()+int(positionmenu.Y-positiontitle.Y)
-  menumaxitensatscreen := (int(winHeight)-titlearea)/font.Height()
+  //we need to know how many itens fit at the screen size, it's all math: maxitems = (screenheight-titleheight)/lineheight
+  titleheight := int(positiontitle.Y)+int(positionmenu.Y-positiontitle.Y)
+  menumaxitensatscreen := (int(winHeight)-titleheight)/font.Height()
+
+  //as the function that "writes" only works with a single string (as far as i could test it) 
+  //we need to set the menu text as it with "\n" as line breaker 
+  for n := 1; n <= menumaxitensatscreen; n++ {
+    buffer.WriteString(menu.Options[menuitens[n]].Desc)
+    buffer.WriteString("\n")
+  }
+  menuitenstext := buffer.String()
 
   //this renders our title and menu itens at a surface that will be rendered at the screen later
   titletext, _ = font.RenderUTF8Blended(menu.Name, sdlcolornames.Grey) 
-  menutext, _ = font.RenderUTF8BlendedWrapped(menuitens, sdlcolornames.Black, int(winWidth - 20))
+  menutext, _ = font.RenderUTF8BlendedWrapped(menuitenstext, sdlcolornames.Black, int(winWidth - 20))
   
   //we need to know the active surface at screen so we can "paste" our texts there later
   surface, _ = window.GetSurface()
@@ -170,12 +173,13 @@ func run() int {
 
   last := time.Now()
   running := true
+  positionmenucursor := 1
   for running {
     renderer.SetDrawColor(backgroundcolor.R, backgroundcolor.G, backgroundcolor.B, backgroundcolor.A)
     renderer.Clear()
     renderer.Present()
 
-    drawmenucursor(renderer, menucursorcolor, positionmenucursor)
+    drawmenucursor(renderer, menucursorcolor, menucursor)
 
     titletext.Blit(nil, surface, &positiontitle)
     menutext.Blit(nil, surface, &positionmenu)
@@ -191,26 +195,33 @@ func run() int {
         }
         if t.Type == sdl.KEYDOWN {
           if t.Keysym.Sym == sdl.K_UP {
-            if positionmenucursor.Y != positionmenu.Y {
-              positionmenucursor.Y -= positionmenucursor.H
+            if menucursor.Y != positionmenu.Y {
+              menucursor.Y -= menucursor.H
+              positionmenucursor--
               last = time.Now()
             }
           }
           if t.Keysym.Sym == sdl.K_DOWN {
-            positionmenucursor.Y += positionmenucursor.H
-            last = time.Now()
+            if positionmenucursor < menumaxitensatscreen && positionmenucursor < len(menuitens) {
+              menucursor.Y += menucursor.H
+              positionmenucursor++
+              last = time.Now()
+            }
+          }
+          if t.Keysym.Sym == sdl.K_RETURN {
+            fmt.Println(menu.Options[menuitens[positionmenucursor]].Cmd)
           }
         }
       case *sdl.JoyHatEvent:
         if input.Config.Type == "joystick" {
           switch t.Value {
             case joystick_up.Value:
-              if positionmenucursor.Y != positionmenu.Y {
-                positionmenucursor.Y -= positionmenucursor.H
+              if menucursor.Y != positionmenu.Y {
+                menucursor.Y -= menucursor.H
                 last = time.Now()
               }
             case joystick_down.Value:
-              positionmenucursor.Y += positionmenucursor.H
+              menucursor.Y += menucursor.H
               last = time.Now()
           }
         }
@@ -218,10 +229,7 @@ func run() int {
         fmt.Printf("%+v\n", t)
       case *sdl.JoyDeviceEvent:
         if t.Type == sdl.JOYDEVICEADDED {
-          /*joysticks[int(t.Which)] = */sdl.JoystickOpen(t.Which)
-          /*if joysticks[int(t.Which)] != nil {
-            fmt.Printf("Joystick %d connected\n", t.Which)
-          }*/
+          sdl.JoystickOpen(t.Which)
         }
       }
     }
