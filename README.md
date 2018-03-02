@@ -4,8 +4,28 @@ This is a simple config menu to be used at [Game Boy Zero projects](http://www.s
 
 It's a Work In Progress (still only at visual part =p)
 
-## Sample menu definition (yaml file)
+## Requirements
+
+*  SDL2-dev
+*  [go-sdl2](https://github.com/veandco/go-sdl2/)
+*  [go yaml package](http://gopkg.in/yaml.v2)
+
+At debian based linux you can install them with:
+```bash
+apt-get install -y libsdl2{,-mixer,-image,-ttf,-gfx}-dev
+go get github.com/veandco/go-sdl2/sdl
+go get github.com/veandco/go-sdl2/ttf
+go get gopkg.in/yaml.v2
 ```
+
+## How to use
+
+Just clone the repo at your gopath src and build it with `go build menu.go` and then use it with `menu yamlmenudefinitionfile.yml`
+
+Please note that the EmulationStation input file is hardcoded as `/opt/retropie/configs/all/emulationstation/es_input.cfg` for now, you can change it at line 41
+
+## Sample menu definition (yaml file)
+```yaml
 ---
 name: "Yaya's power optimization"
 
