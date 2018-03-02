@@ -9,6 +9,7 @@ import (
   "encoding/xml"
   "sort"
   "bytes"
+  "path/filepath"
 
   "github.com/veandco/go-sdl2/sdl"
   "github.com/veandco/go-sdl2/ttf"
@@ -27,8 +28,8 @@ type (
     Check string
   }
   menulist struct {
-    Name string 
-    Options map[string]items 
+    Name string
+    Options map[string]items
   }
 )
 
@@ -37,7 +38,7 @@ var (
   winWidth, winHeight int32
   fonttype string = "resources/opensans_hebrew_condensed_regular.ttf"
   fontsize int
-  es_inputcfg string = "es_input.cfg"
+  es_inputcfg string = "/opt/retropie/configs/all/emulationstation/es_input.cfg"
   backgroundcolor sdl.Color = sdlcolornames.Whitesmoke
   menucursorcolor sdl.Color = sdlcolornames.Grey
   positiontitle sdl.Rect = sdl.Rect{80, 5, 0, 0}
@@ -119,10 +120,10 @@ func run() int {
 
   sdl.GetDisplayBounds(0, &displaybounds)
   
-  winWidth =  320 // displaybounds.W
-  winHeight = 240 // displaybounds.H
+  winWidth =  displaybounds.W
+  winHeight = displaybounds.H
 
-  window, _ = sdl.CreateWindow(winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, winWidth, winHeight, sdl.WINDOW_SHOWN) // | sdl.WINDOW_FULLSCREEN)
+  window, _ = sdl.CreateWindow(winTitle, sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, winWidth, winHeight, sdl.WINDOW_SHOWN | sdl.WINDOW_FULLSCREEN)
   defer window.Destroy()
 
   menu := menulistyaml()
@@ -145,7 +146,9 @@ func run() int {
   fontsize = int(winWidth/20)
 
   //we need a font to work with =p for now we'll use same font/size for title and itens
-  font, _ = ttf.OpenFont(fonttype, fontsize)
+  dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+  fontdir := dir + "/" + fonttype
+  font, _ = ttf.OpenFont(fontdir, fontsize)
   
   //so we can set the title to be centralized :)
   titlewidth, _, _ := font.SizeUTF8(menu.Name)
@@ -179,6 +182,7 @@ func run() int {
 
     titletext.Blit(nil, surface, &positiontitle)
     menutext.Blit(nil, surface, &positionmenu)
+    window.UpdateSurface()
 
     if time.Since(last).Seconds() > 0.15 {
       switch buttonpressed {
@@ -209,6 +213,19 @@ func run() int {
           last = time.Now()
         }
       case "a":
+        oldtitle := menu.Name
+        menu.Name = "Working..."
+        //so we can set the title to be centralized :)
+        titlewidth, _, _ = font.SizeUTF8(menu.Name)
+        positiontitle.X = int32(int(winWidth)/2 - titlewidth/2)
+        titletext, menutext = drawmenuitens(menuitens, firstmenuitem, menumaxitensatscreen, menu, font, surface)
+        renderer.SetDrawColor(backgroundcolor.R, backgroundcolor.G, backgroundcolor.B, backgroundcolor.A)
+        renderer.Clear()
+        renderer.Present()
+        drawmenucursor(renderer, sdlcolornames.Lightgrey, menucursor)
+        titletext.Blit(nil, surface, &positiontitle)
+        menutext.Blit(nil, surface, &positionmenu)
+        window.UpdateSurface()
         if menu.Options[menuitens[positionmenucursor]].Check != "" {
           if err := exec.Command("/bin/bash", "-c", menu.Options[menuitens[positionmenucursor]].Check).Run(); err != nil {
             runcommand(menu.Options[menuitens[positionmenucursor]].Cmd)
@@ -218,6 +235,10 @@ func run() int {
         } else {
           runcommand(menu.Options[menuitens[positionmenucursor]].Cmd)
         }
+        menu.Name = oldtitle
+        //so we can set the title to be centralized :)
+        titlewidth, _, _ = font.SizeUTF8(menu.Name)
+        positiontitle.X = int32(int(winWidth)/2 - titlewidth/2)
         last = time.Now()
         titletext, menutext = drawmenuitens(menuitens, firstmenuitem, menumaxitensatscreen, menu, font, surface)
       case "b":
@@ -246,7 +267,7 @@ func run() int {
             buttonpressed = ""
           }
         }
-        
+
       case *sdl.JoyHatEvent:
         if input.Config.Type == "joystick" {
           switch t.Value {
@@ -280,7 +301,6 @@ func run() int {
           sdl.JoystickOpen(t.Which)
         }
       }
-    window.UpdateSurface()
   }
   return 0
 }
@@ -291,10 +311,7 @@ func menulistyaml() menulist{
   yamlfile, _ := os.Open(os.Args[1])
   menulistfile, _ := ioutil.ReadAll(yamlfile)
 
-  err := yaml.UnmarshalStrict([]byte(menulistfile),&menu)
-  if err != nil {
-    fmt.Println(err)
-  }
+  yaml.Unmarshal([]byte(menulistfile),&menu)
 
   return menu
 }
@@ -318,8 +335,9 @@ func drawmenuitens(menuitens map[int]string, position int, menumaxitensatscreen 
   for n := 1; n <= menumaxitensatscreen; n++ {
     //the function that "writes" only works with a single string (as far as i could test it) 
     //we need to set the menu text as it with "\n" as line breaker 
-    
+
     if menu.Options[menuitens[item]].Check != "" {
+      //TODO: Find a better/more secure way to do that (run the command at the yaml)
       if err := exec.Command("/bin/bash", "-c", menu.Options[menuitens[item]].Check).Run(); err != nil {
         buffer.WriteString(menu.Options[menuitens[item]].Desc)
       } else {
