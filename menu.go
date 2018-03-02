@@ -16,7 +16,7 @@ import (
   "gopkg.in/yaml.v2"
 
   //this makes our life easier by giving the sdl.Color corresponding to the colorname (converted from golang.org/x/image/colornames)
-  "sdlcolornames"
+  "./sdlcolornames"
 )
 
 type (
@@ -298,7 +298,7 @@ func run() int {
         }
       case *sdl.JoyDeviceEvent:
         if t.Type == sdl.JOYDEVICEADDED {
-          sdl.JoystickOpen(t.Which)
+          sdl.JoystickOpen(int(t.Which))
         }
       }
   }
