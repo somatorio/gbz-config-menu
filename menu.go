@@ -118,8 +118,8 @@ func run() int {
 
   ttf.Init()
 
-  sdl.GetDisplayBounds(0, &displaybounds)
-  
+  displaybounds, _ = sdl.GetDisplayBounds(0)
+
   winWidth =  displaybounds.W
   winHeight = displaybounds.H
 
