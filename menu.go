@@ -142,14 +142,14 @@ func run() int {
     menuitens[n] = k
     n++
   }
-  
+
   fontsize = int(winWidth/20)
 
   //we need a font to work with =p for now we'll use same font/size for title and itens
   dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
   fontdir := dir + "/" + fonttype
   font, _ = ttf.OpenFont(fontdir, fontsize)
-  
+
   //so we can set the title to be centralized :)
   titlewidth, _, _ := font.SizeUTF8(menu.Name)
   positiontitle.X = int32(int(winWidth)/2 - titlewidth/2)
@@ -161,12 +161,15 @@ func run() int {
   positionmenu = sdl.Rect{30, int32(titleheight+5), 0, 0}
   //so we can set the menucursor height to be relative to font size :)
   menucursor = sdl.Rect{10, positionmenu.Y,winWidth - 20,int32(font.Height())}
-  
+
   //we need to know the active surface at screen so we can "paste" our texts there later
   surface, _ = window.GetSurface()
 
   //create the renderer that will colour our background and menu cursor
   renderer, _ := sdl.CreateSoftwareRenderer(surface)
+
+  // hide the cursor
+  sdl.ShowCursor(0)
 
   last := time.Now()
   running := true
