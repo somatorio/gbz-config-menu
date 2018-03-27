@@ -292,8 +292,20 @@ func run() int {
               buttonpressed = ""
             }
           case uint8(joystick_b.Id):
-            if t.State == joystick_a.Value {
+            if t.State == joystick_b.Value {
               buttonpressed = "b"
+            } else {
+              buttonpressed = ""
+            }
+          case uint8(joystick_up.Id):
+            if t.State == joystick_up.Value {
+              buttonpressed = "up"
+            } else {
+              buttonpressed = ""
+            }
+          case uint8(joystick_down.Id):
+            if t.State == joystick_down.Value {
+              buttonpressed = "down"
             } else {
               buttonpressed = ""
             }
